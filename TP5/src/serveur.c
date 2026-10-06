@@ -65,6 +65,62 @@ int recois_envoie_message(int client_socket_fd, char *data)
 }
 
 /**
+ * Reçoit une opération, effectue le calcul et renvoie le résultat au client.
+ */
+int recois_numeros_calcule(int client_socket_fd, char *data)
+{
+    char operateur;
+    double nombre1;
+    double nombre2;
+    double resultat;
+    char message[1024];
+
+    if (sscanf(data, "calcule : %c %lf %lf",
+               &operateur, &nombre1, &nombre2) != 3)
+    {
+        snprintf(message, sizeof(message),
+                 "Erreur : opération invalide");
+        return renvoie_message(client_socket_fd, message);
+    }
+
+    switch (operateur)
+    {
+        case '+':
+            resultat = nombre1 + nombre2;
+            break;
+
+        case '-':
+            resultat = nombre1 - nombre2;
+            break;
+
+        case '*':
+            resultat = nombre1 * nombre2;
+            break;
+
+        case '/':
+            if (nombre2 == 0)
+            {
+                snprintf(message, sizeof(message),
+                         "Erreur : division par zéro");
+                return renvoie_message(client_socket_fd, message);
+            }
+
+            resultat = nombre1 / nombre2;
+            break;
+
+        default:
+            snprintf(message, sizeof(message),
+                     "Erreur : opérateur inconnu");
+            return renvoie_message(client_socket_fd, message);
+    }
+
+    snprintf(message, sizeof(message),
+             "calcule : %.2f", resultat);
+
+    return renvoie_message(client_socket_fd, message);
+}
+
+/**
  * Gestionnaire de signal pour Ctrl+C.
  */
 void gestionnaire_ctrl_c(int signal)
@@ -107,7 +163,14 @@ void gerer_client(int client_socket_fd)
             break;
         }
 
-        recois_envoie_message(client_socket_fd, data);
+        if (strncmp(data, "calcule :", 9) == 0)
+        {
+            recois_numeros_calcule(client_socket_fd, data);
+        }
+        else
+        {
+            recois_envoie_message(client_socket_fd, data);
+        }
     }
 }
 
