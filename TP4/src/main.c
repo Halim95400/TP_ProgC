@@ -1,39 +1,31 @@
 #include <stdio.h>
-#include <string.h>
-#include "fichier.h"
+#include <stdlib.h>
+#include "liste.h"
 
 int main(void)
 {
-    int choix;
-    char nom_fichier[100];
-    char message[500];
+    Couleur *liste;
 
-    printf("1. Lire un fichier\n");
-    printf("2. Écrire dans un fichier\n");
-    printf("Choix : ");
-    scanf("%d", &choix);
+    init_liste(&liste);
 
-    printf("Nom du fichier : ");
-    scanf("%99s", nom_fichier);
+    insertion(&liste, 255, 0, 0);
+    insertion(&liste, 0, 255, 0);
+    insertion(&liste, 0, 0, 255);
+    insertion(&liste, 255, 255, 0);
+    insertion(&liste, 255, 0, 255);
+    insertion(&liste, 0, 255, 255);
+    insertion(&liste, 255, 255, 255);
+    insertion(&liste, 128, 128, 128);
+    insertion(&liste, 0, 0, 0);
+    insertion(&liste, 128, 0, 128);
 
-    if (choix == 1)
+    parcours(liste);
+
+    while (liste != NULL)
     {
-        lire_fichier(nom_fichier);
-    }
-    else if (choix == 2)
-    {
-        getchar();
-
-        printf("Message à écrire : ");
-        fgets(message, sizeof(message), stdin);
-
-        message[strcspn(message, "\n")] = '\0';
-
-        ecrire_dans_fichier(nom_fichier, message);
-    }
-    else
-    {
-        printf("Choix invalide.\n");
+        Couleur *temp = liste;
+        liste = liste->suivant;
+        free(temp);
     }
 
     return 0;
