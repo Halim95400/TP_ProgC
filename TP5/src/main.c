@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    lire_dossier_recursif(argv[1]);
+    lire_dossier_iteratif(argv[1]);
 
     return 0;
 }
