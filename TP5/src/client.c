@@ -16,117 +16,165 @@
 #include "client.h"
 
 /**
- * Fonction pour envoyer et recevoir un message depuis un client connecté à la socket.
+ * Envoie une opération au serveur et récupère le résultat.
  */
-int envoie_recois_message(int socketfd)
+int envoyer_calcul(int socketfd, char operateur, double nombre1, double nombre2, double *resultat)
 {
-  char data[1024];
+    char data[1024];
 
-  memset(data, 0, sizeof(data));
+    snprintf(data, sizeof(data),
+             "calcule : %c %.2f %.2f",
+             operateur, nombre1, nombre2);
 
-  char message[1024];
-  printf("Votre message (max 1000 caractères): ");
-  fgets(message, sizeof(message), stdin);
+    if (write(socketfd, data, strlen(data)) < 0)
+    {
+        perror("Erreur d'écriture");
+        return -1;
+    }
 
-  strcpy(data, "message: ");
-  strcat(data, message);
+    memset(data, 0, sizeof(data));
 
-  int write_status = write(socketfd, data, strlen(data));
-  if (write_status < 0)
-  {
-    perror("Erreur d'écriture");
-    return -1;
-  }
+    int read_status = read(socketfd, data, sizeof(data) - 1);
 
-  memset(data, 0, sizeof(data));
+    if (read_status < 0)
+    {
+        perror("Erreur de lecture");
+        return -1;
+    }
 
-  int read_status = read(socketfd, data, sizeof(data));
-  if (read_status < 0)
-  {
-    perror("Erreur de lecture");
-    return -1;
-  }
+    data[read_status] = '\0';
 
-  printf("Message reçu: %s\n", data);
+    if (sscanf(data, "calcule : %lf", resultat) != 1)
+    {
+        printf("Réponse du serveur : %s\n", data);
+        return -1;
+    }
 
-  return 0;
-}
+    printf("%s\n", data);
 
-/**
- * Envoie une opération de calcul au serveur.
- */
-int envoie_operateur_numeros(int socketfd)
-{
-  char operateur;
-  double nombre1;
-  double nombre2;
-  char data[1024];
-
-  printf("Entrez l'opérateur (+, -, *, /) : ");
-  scanf(" %c", &operateur);
-
-  printf("Entrez le premier nombre : ");
-  scanf("%lf", &nombre1);
-
-  printf("Entrez le deuxième nombre : ");
-  scanf("%lf", &nombre2);
-
-  snprintf(data, sizeof(data), "calcule : %c %.2f %.2f",
-           operateur, nombre1, nombre2);
-
-  if (write(socketfd, data, strlen(data)) < 0)
-  {
-    perror("Erreur d'écriture");
-    return -1;
-  }
-
-  memset(data, 0, sizeof(data));
-
-  if (read(socketfd, data, sizeof(data)) < 0)
-  {
-    perror("Erreur de lecture");
-    return -1;
-  }
-
-  printf("%s\n", data);
-
-  return 0;
+    return 0;
 }
 
 int main()
 {
-  int socketfd;
+    int socketfd;
+    struct sockaddr_in server_addr;
 
-  struct sockaddr_in server_addr;
+    double notes[5];
+    double somme1;
+    double somme2;
+    double somme_totale;
+    double moyenne;
 
-  socketfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (socketfd < 0)
-  {
-    perror("socket");
-    exit(EXIT_FAILURE);
-  }
+    /*
+     * Lecture du fichier des étudiants.
+     */
+    FILE *fichier = fopen("../../TP4/src/etudiant.txt", "r");
 
-  memset(&server_addr, 0, sizeof(server_addr));
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(PORT);
-  server_addr.sin_addr.s_addr = INADDR_ANY;
+    if (fichier == NULL)
+    {
+        perror("Impossible d'ouvrir etudiant.txt");
+        return EXIT_FAILURE;
+    }
 
-  int connect_status = connect(socketfd,
-                               (struct sockaddr *)&server_addr,
-                               sizeof(server_addr));
+    char nom[50];
+    char prenom[50];
+    int age;
 
-  if (connect_status < 0)
-  {
-    perror("connection serveur");
-    exit(EXIT_FAILURE);
-  }
+    for (int i = 0; i < 5; i++)
+    {
+        if (fscanf(fichier, "%49s %49s %d %lf",
+                   nom, prenom, &age, &notes[i]) != 4)
+        {
+            printf("Erreur de lecture de l'étudiant %d.\n", i + 1);
+            fclose(fichier);
+            return EXIT_FAILURE;
+        }
 
-  while (1)
-  {
-    envoie_operateur_numeros(socketfd);
-  }
+        printf("Étudiant %d : %s %s - note %.2f\n",
+               i + 1, nom, prenom, notes[i]);
+    }
 
-  close(socketfd);
+    fclose(fichier);
 
-  return 0;
+    /*
+     * Création de la socket.
+     */
+    socketfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (socketfd < 0)
+    {
+        perror("socket");
+        return EXIT_FAILURE;
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    /*
+     * Connexion au serveur.
+     */
+    if (connect(socketfd,
+                (struct sockaddr *)&server_addr,
+                sizeof(server_addr)) < 0)
+    {
+        perror("connection serveur");
+        close(socketfd);
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Note 1 + Note 2
+     */
+    if (envoyer_calcul(socketfd, '+', notes[0], notes[1], &somme1) < 0)
+    {
+        close(socketfd);
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Note 3 + Note 4
+     */
+    if (envoyer_calcul(socketfd, '+', notes[2], notes[3], &somme2) < 0)
+    {
+        close(socketfd);
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Somme des deux premiers résultats.
+     */
+    if (envoyer_calcul(socketfd, '+', somme1, somme2, &somme_totale) < 0)
+    {
+        close(socketfd);
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Ajout de la cinquième note.
+     */
+    if (envoyer_calcul(socketfd, '+', somme_totale, notes[4], &somme_totale) < 0)
+    {
+        close(socketfd);
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Moyenne des 5 étudiants.
+     */
+    if (envoyer_calcul(socketfd, '/', somme_totale, 5, &moyenne) < 0)
+    {
+        close(socketfd);
+        return EXIT_FAILURE;
+    }
+
+    printf("\nSomme totale : %.2f\n", somme_totale);
+    printf("Moyenne de la classe : %.2f\n", moyenne);
+
+    close(socketfd);
+
+    return 0;
 }
